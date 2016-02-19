@@ -6,10 +6,10 @@
 //Logic (functional)
 function main (sources) {
 
-  const click$ = sources.DOM;
+  const mouseover$ = sources.DOM.selectEvents('span', 'mouseover');
 
   const sinks =  {
-    DOM : click$
+    DOM : mouseover$
       .startWith(null) //start with null click
       .flatMapLatest(function () {
         return Rx.Observable.timer(0, 1000).map(function(i) {
@@ -66,7 +66,14 @@ function DOMDriver ( obj$ ) {
 
   });
 
-  const DOMSource = Rx.Observable.fromEvent(document, 'click');
+  const DOMSource = {
+    selectEvents : function (tagName, eventType) {
+      return Rx.Observable.fromEvent(document, eventType)
+        .filter(function (ev) {
+          return ev.target.tagName === tagName.toUpperCase();
+        });
+    }
+  }
   return DOMSource;
 }
 

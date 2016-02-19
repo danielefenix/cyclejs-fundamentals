@@ -6,18 +6,19 @@
 //Logic (functional)
 function main (sources) {
 
-  const mouseover$ = sources.DOM.select('span').events('mouseover');
+  const inputEv$ = sources.DOM.select('.field').events('input');
+  const name$ = inputEv$.map(function(ev){ return ev.target.value; }).startWith("World");
 
   const sinks =  {
-    DOM : mouseover$
-      .startWith(null) //start with null click
-      .flatMapLatest(function () {
-        return Rx.Observable.timer(0, 1000).map(
-          function(i) {
-            return CycleDOM.h1({style: { background: 'red'}}, [ CycleDOM.span(["Seconds elapsed " + i]) ])
+    DOM : name$.map(
+      function (name) {
+        return  CycleDOM.div([
+                CycleDOM.label('Name'),
+                CycleDOM.input('.field', {type: 'input'}),
+                CycleDOM.hr(),
+                CycleDOM.h1("Hello " + name+ "!")
+            ])
           })
-      }),
-    Log: Rx.Observable.timer(0, 2000).map(function (i) { return 2 * i ;})
   }
 
   return sinks;

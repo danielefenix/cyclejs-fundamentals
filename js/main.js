@@ -11,20 +11,31 @@ function main () {
 }
 
 //Effects (imperative)
-function DOMEffect ( text$ ) {
+function DOMDriver ( text$ ) {
   text$.subscribe(function(text) {
     const container = document.querySelector("#timer");
     container.textContent = text;
   });
 }
-function ConsoleLogEffect( msg$ ) {
+
+function consoleLogDriver( msg$ ) {
   msg$.subscribe(function (text) {
     console.log(text);
   })
 }
 
-// start app
-const sink = main();
-DOMEffect(sink.DOM);
+function run(mainFn, effects) {
+  const sinks = mainFn();
+  //loop through the keyset of effect and pass the correspondent logic
+  Object.keys(effects).forEach(function (key) {
+    effects[key](sinks[key]);
+  })
+}
 
-ConsoleLogEffect(sink.Log);
+const drivers = {
+  DOM: DOMDriver,
+  Log: consoleLogDriver
+}
+
+//Run app
+run(main, drivers);

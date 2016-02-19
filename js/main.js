@@ -12,7 +12,19 @@ function main (sources) {
     DOM : click$
       .startWith(null) //start with null click
       .flatMapLatest(function () {
-        return Rx.Observable.timer(0, 1000).map(function(i) { return "Second elapsed " + i ; })
+        return Rx.Observable.timer(0, 1000).map(function(i) {
+          return {
+            tagName: "H1",
+            children: [
+              {
+                tagName: "SPAN",
+                children : [
+                  "Seconds elapsed " + i
+                ]
+              }
+            ]
+          } ;
+        })
       }),
     Log: Rx.Observable.timer(0, 2000).map(function (i) { return 2 * i ;})
   }
@@ -21,11 +33,39 @@ function main (sources) {
 }
 
 //Effects (imperative)
-function DOMDriver ( text$ ) {
-  text$.subscribe(function(text) {
+function DOMDriver ( obj$ ) {
+
+  function createElement(obj) {
+      const element= document.createElement(obj.tagName);
+
+      obj.children
+      .filter(function (c) {
+          return typeof c === 'object';
+      })
+      .map(createElement)
+      .forEach(function(c) {
+        element.appendChild(c);
+      });
+
+      obj.children
+      .filter(function (c) {
+          return typeof c === 'string';
+      })
+      .forEach(function (c) {
+          return element.innerHTML += c;
+      });
+
+      return element;
+  }
+
+  obj$.subscribe(function(obj) {
     const container = document.querySelector("#timer");
-    container.textContent = text;
+    const element = createElement(obj);
+    container.innerHTML = ''; //empty container
+    container.appendChild(element);
+
   });
+
   const DOMSource = Rx.Observable.fromEvent(document, 'click');
   return DOMSource;
 }

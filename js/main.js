@@ -3,6 +3,27 @@
 //source: input (read) effects
 //sinks: output (write) effects
 
+function h(tagName, children) {
+  return {
+    tagName: tagName,
+    children: children
+  }
+}
+
+function h1(children) {
+  return {
+    tagName: "H1",
+    children: children
+  }
+}
+
+function span(children) {
+  return {
+    tagName: "SPAN",
+    children: children
+  }
+}
+
 //Logic (functional)
 function main (sources) {
 
@@ -12,19 +33,10 @@ function main (sources) {
     DOM : mouseover$
       .startWith(null) //start with null click
       .flatMapLatest(function () {
-        return Rx.Observable.timer(0, 1000).map(function(i) {
-          return {
-            tagName: "H1",
-            children: [
-              {
-                tagName: "SPAN",
-                children : [
-                  "Seconds elapsed " + i
-                ]
-              }
-            ]
-          } ;
-        })
+        return Rx.Observable.timer(0, 1000).map(
+          function(i) {
+            return h1([ span(["Seconds elapsed " + i]) ])
+          })
       }),
     Log: Rx.Observable.timer(0, 2000).map(function (i) { return 2 * i ;})
   }
@@ -74,6 +86,7 @@ function DOMDriver ( obj$ ) {
         });
     }
   }
+
   return DOMSource;
 }
 

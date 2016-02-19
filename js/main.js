@@ -4,11 +4,11 @@
 //sinks: output (write) effects
 
 //Logic (functional)
-function main (DOMSource) {
+function main (sources) {
 
-  const click$ = DOMSource;
+  const click$ = sources.DOM;
 
-  return {
+  const sinks =  {
     DOM : click$
       .startWith(null) //start with null click
       .flatMapLatest(function () {
@@ -16,6 +16,8 @@ function main (DOMSource) {
       }),
     Log: Rx.Observable.timer(0, 2000).map(function (i) { return 2 * i ;})
   }
+
+  return sinks;
 }
 
 //Effects (imperative)
@@ -31,28 +33,35 @@ function DOMDriver ( text$ ) {
 function consoleLogDriver( msg$ ) {
   msg$.subscribe(function (text) {
     console.log(text);
-  })
+  });
+
 }
 
 // bProxy = ...
 // a = f(bProxy)
 // b = g(a)
 // bProxy.imitate(b)
-
+/*
 function run(mainFn, drivers) {
-  const proxyDOMSource = new Rx.Subject();
-  const sinks = mainFn(proxyDOMSource);
-  const DOMSource = drivers.DOM(sinks.DOM);
 
-  DOMSource.subscribe(function (click) {
-    proxyDOMSource.onNext(click);
-  })
+  const proxySources = {};
+  //create a proxySouce for each of the drivers to allow read effect
+  Object.keys(drivers).forEach(function (key) {
+    proxySources[key] = new Rx.Subject();
+  });
+
+  const sinks = mainFn(proxySources);
 
   //loop through the keyset of effect and pass the correspondent logic
-  //Object.keys(drivers).forEach(function (key) {
-  //  effects[key](sinks[key]);
-  //})
+  Object.keys(drivers).forEach(function (key) {
+    const source = drivers[key](sinks[key]);
+    source.subscribe(function (x) {
+      proxySources[key].onNext(x);
+    });
+  });
 }
+run(main, drivers);
+*/
 
 const drivers = {
   DOM: DOMDriver,
@@ -60,4 +69,4 @@ const drivers = {
 }
 
 //Run app
-run(main, drivers);
+Cycle.run(main, drivers);

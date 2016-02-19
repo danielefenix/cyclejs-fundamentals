@@ -2,8 +2,12 @@
 
 //Logic (functional)
 function main () {
-  return Rx.Observable.timer(0, 1000) // 0---1---2
-    .map(function(i) { return "Second elapsed " + i ; });
+  return {
+    DOM : Rx.Observable.timer(0, 1000) // 0---1---2
+    .map(function(i) { return "Second elapsed " + i ; }),
+    Log: Rx.Observable.timer(0, 2000)
+    .map(function (i) { return 2 * i ;})
+  }
 }
 
 //Effects (imperative)
@@ -21,5 +25,6 @@ function ConsoleLogEffect( msg$ ) {
 
 // start app
 const sink = main();
-DOMEffect(sink);
-ConsoleLogEffect(sink)
+DOMEffect(sink.DOM);
+
+ConsoleLogEffect(sink.Log);

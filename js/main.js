@@ -3,31 +3,10 @@
 //source: input (read) effects
 //sinks: output (write) effects
 
-function h(tagName, children) {
-  return {
-    tagName: tagName,
-    children: children
-  }
-}
-
-function h1(children) {
-  return {
-    tagName: "H1",
-    children: children
-  }
-}
-
-function span(children) {
-  return {
-    tagName: "SPAN",
-    children: children
-  }
-}
-
 //Logic (functional)
 function main (sources) {
 
-  const mouseover$ = sources.DOM.selectEvents('span', 'mouseover');
+  const mouseover$ = sources.DOM.select('span').events('mouseover');
 
   const sinks =  {
     DOM : mouseover$
@@ -35,7 +14,7 @@ function main (sources) {
       .flatMapLatest(function () {
         return Rx.Observable.timer(0, 1000).map(
           function(i) {
-            return h1([ span(["Seconds elapsed " + i]) ])
+            return CycleDOM.h1({style: { background: 'red'}}, [ CycleDOM.span(["Seconds elapsed " + i]) ])
           })
       }),
     Log: Rx.Observable.timer(0, 2000).map(function (i) { return 2 * i ;})
@@ -45,51 +24,6 @@ function main (sources) {
 }
 
 //Effects (imperative)
-function DOMDriver ( obj$ ) {
-
-  function createElement(obj) {
-      const element= document.createElement(obj.tagName);
-
-      obj.children
-      .filter(function (c) {
-          return typeof c === 'object';
-      })
-      .map(createElement)
-      .forEach(function(c) {
-        element.appendChild(c);
-      });
-
-      obj.children
-      .filter(function (c) {
-          return typeof c === 'string';
-      })
-      .forEach(function (c) {
-          return element.innerHTML += c;
-      });
-
-      return element;
-  }
-
-  obj$.subscribe(function(obj) {
-    const container = document.querySelector("#timer");
-    const element = createElement(obj);
-    container.innerHTML = ''; //empty container
-    container.appendChild(element);
-
-  });
-
-  const DOMSource = {
-    selectEvents : function (tagName, eventType) {
-      return Rx.Observable.fromEvent(document, eventType)
-        .filter(function (ev) {
-          return ev.target.tagName === tagName.toUpperCase();
-        });
-    }
-  }
-
-  return DOMSource;
-}
-
 function consoleLogDriver( msg$ ) {
   msg$.subscribe(function (text) {
     console.log(text);
@@ -101,30 +35,9 @@ function consoleLogDriver( msg$ ) {
 // a = f(bProxy)
 // b = g(a)
 // bProxy.imitate(b)
-/*
-function run(mainFn, drivers) {
-
-  const proxySources = {};
-  //create a proxySouce for each of the drivers to allow read effect
-  Object.keys(drivers).forEach(function (key) {
-    proxySources[key] = new Rx.Subject();
-  });
-
-  const sinks = mainFn(proxySources);
-
-  //loop through the keyset of effect and pass the correspondent logic
-  Object.keys(drivers).forEach(function (key) {
-    const source = drivers[key](sinks[key]);
-    source.subscribe(function (x) {
-      proxySources[key].onNext(x);
-    });
-  });
-}
-run(main, drivers);
-*/
 
 const drivers = {
-  DOM: DOMDriver,
+  DOM: CycleDOM.makeDOMDriver("#timer"),
   Log: consoleLogDriver
 }
 

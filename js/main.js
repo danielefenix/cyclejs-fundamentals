@@ -1,69 +1,131 @@
-//Timer
-
 //source: input (read) effects
 //sinks: output (write) effects
 
-//Logic (functional)
-function main(sources) {
-
-    //Hello world
-    const inputEv$ = sources.HELLO_WORLD.select('.field').events('input');
-    const name$ = inputEv$.map(function (ev) {
+// ==== HELLO WORLD
+function helloWorldIntent(helloWorldDOMSource) {
+    return helloWorldDOMSource.select('.field').events('input').map(function (ev) {
         return ev.target.value;
-    }).startWith("World");
+    })
+}
+function helloWorldModel(name$) {
+    return name$.startWith('World');
+}
+function helloWorldView(name$) {
+
+    return name$.map(
+        function (name) {
+            return CycleDOM.div([
+                CycleDOM.label('Name'),
+                CycleDOM.input('.field', {type: 'input'}),
+                CycleDOM.p([
+                    CycleDOM.label("Hello " + name + "!")
+                ])
+            ])
+        })
+}
+
+// ==== COUNTER
+function counterIntent(counterSource) {
 
     //Counter
-    const decrementClick$ = sources.COUNTER.select('.decrement').events('click');
-    const incrementClick$ = sources.COUNTER.select('.increment').events('click');
-    const decremenetAction$ = decrementClick$.map(function () {
+    const decrementClick$ = counterSource.select('.decrement').events('click');
+    const incrementClick$ = counterSource.select('.increment').events('click');
+    const decrementAction$ = decrementClick$.map(function () {
         return -1
     });
-    const incremenetAction$ = incrementClick$.map(function () {
+    const incrementAction$ = incrementClick$.map(function () {
         return +1
     });
-    const number$ = Rx.Observable.of(0)
-        .merge(decremenetAction$)
-        .merge(incremenetAction$)
+
+    return {
+        decrementAction$: decrementAction$,
+        incrementAction$: incrementAction$
+    }
+}
+function counterModel(actions$) {
+
+    return Rx.Observable.of(0)
+        .merge(actions$.decrementAction$)
+        .merge(actions$.incrementAction$)
         .scan(function (prev, curr) {
             return prev + curr;
         }); //keep state with prev (previous value)
 
-    // ---- Http driver
-    //button clicked (DOM read effect)
-    //request sent (HTTP write effect)
-    //response received (HTTP read effect)
-    //data displayed (DOM write effect)
-    const clickEvent$ = sources.HTTP_DOM.select('.get-first').events('click');
+}
+function counterView(number$) {
+    return number$.map(function (number) {
+        return CycleDOM.div([
+            CycleDOM.button('.decrement', 'Decrement'),
+            CycleDOM.button('.increment', 'Increment'),
+            CycleDOM.p([
+                CycleDOM.label(String(number))
+            ])
+        ])
+    })
+}
 
-    const request$ = clickEvent$.map(function () {
+// ==== HTTP DRIVER
+//button clicked (DOM read effect)
+//request sent (HTTP write effect)
+//response received (HTTP read effect)
+//data displayed (DOM write effect)
+function httpDriverRequestIntent(httpDriverDomSource) {
+    return httpDriverDomSource.select('.get-first').events('click');
+}
+function httpDriverRequestModel(clickEvent$) {
+
+    return clickEvent$.map(function () {
         return {
             url: 'http://jsonplaceholder.typicode.com/users/1',
             method: 'GET'
         }
-    });
+    })
 
+}
+function httpDriverResponseModel(httpDriverSource) {
     //stream of streams
-    const response$$ = sources.HTTP.filter(function (response$) {
+    const response$$ = httpDriverSource.filter(function (response$) {
         return response$.request.url === 'http://jsonplaceholder.typicode.com/users/1'; //filter request that match the url
     });
     const response$ = response$$.switch();
-    const firstUser$ = response$.map(function (res) {
+    //First user
+    return response$.map(function (res) {
         return res.body;
     }).startWith(null);
 
-    //----- Body-mass calculator
-    //detect slider change (DOM read effect)
-    //calculate BMI (logic)
-    //display BMI (DOM write effect)
-    const changeWeight$ = sources.BMI_DOM.select('.weight').events('input').map(function (ev) {
+}
+function httpDriverResponseView(firstUser$) {
+    return firstUser$.map(function (firstUser) {
+        return CycleDOM.div([
+            CycleDOM.button('.get-first', 'Get first user'),
+            firstUser === null ? null : CycleDOM.div('.user-details', [
+                CycleDOM.h2('.user-name', firstUser.name),
+                CycleDOM.h4('.user-email', firstUser.email),
+                CycleDOM.a('.user-website', {href: 'http://google.com'}, firstUser.website)
+            ])
+
+        ])
+    });
+}
+
+// ==== BMI
+//detect slider change (DOM read effect)
+//calculate BMI (logic)
+//display BMI (DOM write effect)
+function bmiIntent(bmiDomSource) {
+    const changeWeight$ = bmiDomSource.select('.weight').events('input').map(function (ev) {
         return ev.target.value;
     });
-    const changeHeight$ = sources.BMI_DOM.select('.height').events('input').map(function (ev) {
+    const changeHeight$ = bmiDomSource.select('.height').events('input').map(function (ev) {
         return ev.target.value;
     });
 
-    //logic
-    const state$ = Rx.Observable.combineLatest(
+    return {changeWeight$: changeWeight$, changeHeight$: changeHeight$};
+}
+function bmiModel(changes$) {
+    const changeWeight$ = changes$.changeWeight$;
+    const changeHeight$ = changes$.changeHeight$;
+    return Rx.Observable.combineLatest(
         changeWeight$.startWith(70),
         changeHeight$.startWith(170),
         function (weight, height) {
@@ -76,52 +138,54 @@ function main(sources) {
             };
         }
     );
+}
+function bmiView(state$) {
+    return state$.map(function (state) {
+        return CycleDOM.div([
+            CycleDOM.div([
+                CycleDOM.label('Weight: ' + state.weight + 'kg'),
+                CycleDOM.input('.weight', {type: 'range', min: 40, max: 150, value: state.weight})
+            ]),
+            CycleDOM.div([
+                CycleDOM.label('Height: ' + state.height + 'cm'),
+                CycleDOM.input('.height', {type: 'range', min: 140, max: 220, value: state.height})
+            ]),
+            CycleDOM.h4('BMI is ' + state.bmi)
+        ])
+    })
+
+}
+
+//Logic (functional)
+function main(sources) {
+
+    // ==== HELLO WORLD
+    var values$ = helloWorldIntent(sources.HELLO_WORLD_DOM);
+    var names$ = helloWorldModel(values$);
+    var helloWorldVTree$ = helloWorldView(names$);
+
+    // ==== COUNTER
+    const counterActions$ = counterIntent(sources.COUNTER_DOM);
+    const number$ = counterModel(counterActions$);
+    const counterVTree$ = counterView(number$);
+
+    // ==== HTTP DRIVER
+    const clickEvent$ = httpDriverRequestIntent(sources.HTTP_DRIVER_DOM);
+    const request$ = httpDriverRequestModel(clickEvent$);
+    const firstUser$ = httpDriverResponseModel(sources.HTTP);
+    const httpVTree$ = httpDriverResponseView(firstUser$);
+
+    // ==== BMI
+    const changes$ = bmiIntent(sources.BMI_DOM);
+    const state$ = bmiModel(changes$);
+    const bmiVTree$ = bmiView(state$);
 
     const sinks = {
-        HELLO_WORLD: name$.map(
-            function (name) {
-                return CycleDOM.div([
-                    CycleDOM.label('Name'),
-                    CycleDOM.input('.field', {type: 'input'}),
-                    CycleDOM.p([
-                        CycleDOM.label("Hello " + name + "!")
-                    ])
-                ])
-            }),
-        COUNTER: number$.map(function (number) {
-            return CycleDOM.div([
-                CycleDOM.button('.decrement', 'Decrement'),
-                CycleDOM.button('.increment', 'Increment'),
-                CycleDOM.p([
-                    CycleDOM.label(String(number))
-                ])
-            ])
-        }),
+        HELLO_WORLD_DOM: helloWorldVTree$,
+        COUNTER_DOM: counterVTree$,
         HTTP: request$,
-        HTTP_DOM: firstUser$.map(function (firstUser) {
-            return CycleDOM.div([
-                CycleDOM.button('.get-first', 'Get first user'),
-                firstUser === null ? null : CycleDOM.div('.user-details', [
-                    CycleDOM.h2('.user-name', firstUser.name),
-                    CycleDOM.h4('.user-email', firstUser.email),
-                    CycleDOM.a('.user-website', {href: 'http://google.com'}, firstUser.website)
-                ])
-
-            ])
-        }),
-        BMI_DOM: state$.map(function (state) {
-            return CycleDOM.div([
-                CycleDOM.div([
-                    CycleDOM.label('Weight: ' + state.weight + 'kg'),
-                    CycleDOM.input('.weight', {type: 'range', min: 40, max: 150, value: state.weight})
-                ]),
-                CycleDOM.div([
-                    CycleDOM.label('Height: ' + state.height + 'cm'),
-                    CycleDOM.input('.height', {type: 'range', min: 140, max: 220, value: state.height})
-                ]),
-                CycleDOM.h4('BMI is ' + state.bmi)
-            ])
-        })
+        HTTP_DRIVER_DOM: httpVTree$,
+        BMI_DOM: bmiVTree$
     };
 
     return sinks;
@@ -129,10 +193,10 @@ function main(sources) {
 
 //Effects (imperative)
 const drivers = {
-    HELLO_WORLD: CycleDOM.makeDOMDriver("#hello"),
-    COUNTER: CycleDOM.makeDOMDriver("#counter"),
+    HELLO_WORLD_DOM: CycleDOM.makeDOMDriver("#hello"),
+    COUNTER_DOM: CycleDOM.makeDOMDriver("#counter"),
     HTTP: CycleHTTPDriver.makeHTTPDriver(),
-    HTTP_DOM: CycleDOM.makeDOMDriver("#http-dom"),
+    HTTP_DRIVER_DOM: CycleDOM.makeDOMDriver("#http"),
     BMI_DOM: CycleDOM.makeDOMDriver("#bmi")
 };
 

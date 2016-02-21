@@ -108,53 +108,51 @@ function httpDriverResponseView(firstUser$) {
     });
 }
 
-// ==== BMI
-//detect slider change (DOM read effect)
-//calculate BMI (logic)
-//display BMI (DOM write effect)
-function bmiIntent(bmiDomSource) {
-    const changeWeight$ = bmiDomSource.select('.weight').events('input').map(function (ev) {
-        return ev.target.value;
-    });
-    const changeHeight$ = bmiDomSource.select('.height').events('input').map(function (ev) {
-        return ev.target.value;
-    });
-
-    return {changeWeight$: changeWeight$, changeHeight$: changeHeight$};
+// ==== BMI (isolated component)
+function LabeledIntent(DOMSource) {
+    return DOMSource.select('.slider').events('input')
+        .map(function (ev) {
+            return ev.target.value;
+        })
 }
-function bmiModel(changes$) {
-    const changeWeight$ = changes$.changeWeight$;
-    const changeHeight$ = changes$.changeHeight$;
-    return Rx.Observable.combineLatest(
-        changeWeight$.startWith(70),
-        changeHeight$.startWith(170),
-        function (weight, height) {
-            const heightMeters = height * 0.01;
-            const bmi = Math.round(weight / (heightMeters * heightMeters));
-            return {
-                bmi: bmi,
-                weight: weight,
-                height: height
-            };
+function LabeledModel(newValues$, props$) {
+    const initValues$ = props$.map(function (props) {
+        return props.init;
+    }).first();
+    const values$ = initValues$.concat(newValues$);
+    return Rx.Observable.combineLatest(values$, props$, function (value, props) {
+        return {
+            label: props.label,
+            unit: props.unit,
+            min: props.min,
+            max: props.max,
+            value: value
         }
-    );
+    })
 }
-function bmiView(state$) {
+function LabeledView(state$) {
     return state$.map(function (state) {
-        return CycleDOM.div([
-            CycleDOM.div([
-                CycleDOM.label('Weight: ' + state.weight + 'kg'),
-                CycleDOM.input('.weight', {type: 'range', min: 40, max: 150, value: state.weight})
-            ]),
-            CycleDOM.div([
-                CycleDOM.label('Height: ' + state.height + 'cm'),
-                CycleDOM.input('.height', {type: 'range', min: 140, max: 220, value: state.height})
-            ]),
-            CycleDOM.h4('BMI is ' + state.bmi)
+        return CycleDOM.div('.labeled-slider', [
+            CycleDOM.label(state.label + ': ' + state.value + state.unit),
+            CycleDOM.input('.slider', {type: 'range', min: state.min, max: state.max, value: state.value})
         ])
     })
-
 }
+function LabeledSlider(sources) {
+    const change$ = LabeledIntent(sources.DOM);
+    const state$ = LabeledModel(change$, sources.props);
+    const vTree$ = LabeledView(state$);
+    return {
+        DOM: vTree$,
+        value: state$.map(function (state) {
+            return state.value;
+        })
+    }
+}
+function IsolatedLabeledSlider(sources) {
+    return CycleIsolate(LabeledSlider)(sources);
+}
+
 
 //Logic (functional)
 function main(sources) {
@@ -176,9 +174,48 @@ function main(sources) {
     const httpVTree$ = httpDriverResponseView(firstUser$);
 
     // ==== BMI
-    const changes$ = bmiIntent(sources.BMI_DOM);
-    const state$ = bmiModel(changes$);
-    const bmiVTree$ = bmiView(state$);
+    const weightProps$ = Rx.Observable.of({
+        label: 'Weight',
+        unit: 'kg',
+        min: 40,
+        max: 150,
+        init: 70
+    });
+    const weightSinks = IsolatedLabeledSlider({
+        DOM: sources.BMI_DOM,
+        props: weightProps$
+    });
+    const weightVTree$ = weightSinks.DOM;
+    const weightValue$ = weightSinks.value;
+
+    const heightProps$ = Rx.Observable.of({
+        label: 'Height',
+        unit: 'cm',
+        min: 140,
+        max: 220,
+        init: 170
+    });
+    const heightSinks = IsolatedLabeledSlider({
+        DOM: sources.BMI_DOM,
+        props: heightProps$
+    });
+    const heightVTree$ = heightSinks.DOM;
+    const heightValue$ = heightSinks.value;
+
+    const bmi$ = Rx.Observable.combineLatest(weightValue$, heightValue$, function (weight, height) {
+        const heightMeters = height * 0.01;
+        return Math.round(weight / (heightMeters * heightMeters));
+    });
+
+    const bmiVTree$ = Rx.Observable.combineLatest(
+        bmi$, weightVTree$, heightVTree$, function (bmi, weightVTree, heightVTree) {
+            return CycleDOM.div([
+                weightVTree,
+                heightVTree,
+                CycleDOM.h2('BMI is ' + bmi)
+            ])
+        }
+    );
 
     const sinks = {
         HELLO_WORLD_DOM: helloWorldVTree$,

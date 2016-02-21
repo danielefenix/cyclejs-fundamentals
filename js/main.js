@@ -44,12 +44,38 @@ function main(sources) {
 
     //stream of streams
     const response$$ = sources.HTTP.filter(function (response$) {
-            return response$.request.url === 'http://jsonplaceholder.typicode.com/users/1'; //filter request that match the url
-        });
+        return response$.request.url === 'http://jsonplaceholder.typicode.com/users/1'; //filter request that match the url
+    });
     const response$ = response$$.switch();
     const firstUser$ = response$.map(function (res) {
         return res.body;
     }).startWith(null);
+
+    //----- Body-mass calculator
+    //detect slider change (DOM read effect)
+    //calculate BMI (logic)
+    //display BMI (DOM write effect)
+    const changeWeight$ = sources.BMI_DOM.select('.weight').events('input').map(function (ev) {
+        return ev.target.value;
+    });
+    const changeHeight$ = sources.BMI_DOM.select('.height').events('input').map(function (ev) {
+        return ev.target.value;
+    });
+
+    //logic
+    const state$ = Rx.Observable.combineLatest(
+        changeWeight$.startWith(70),
+        changeHeight$.startWith(170),
+        function (weight, height) {
+            const heightMeters = height * 0.01;
+            const bmi = Math.round(weight / (heightMeters * heightMeters));
+            return {
+                bmi: bmi,
+                weight: weight,
+                height: height
+            };
+        }
+    );
 
     const sinks = {
         HELLO_WORLD: name$.map(
@@ -82,6 +108,19 @@ function main(sources) {
                 ])
 
             ])
+        }),
+        BMI_DOM: state$.map(function (state) {
+            return CycleDOM.div([
+                CycleDOM.div([
+                    CycleDOM.label('Weight: ' + state.weight + 'kg'),
+                    CycleDOM.input('.weight', {type: 'range', min: 40, max: 150, value: state.weight})
+                ]),
+                CycleDOM.div([
+                    CycleDOM.label('Height: ' + state.height + 'cm'),
+                    CycleDOM.input('.height', {type: 'range', min: 140, max: 220, value: state.height})
+                ]),
+                CycleDOM.h4('BMI is ' + state.bmi)
+            ])
         })
     };
 
@@ -93,7 +132,8 @@ const drivers = {
     HELLO_WORLD: CycleDOM.makeDOMDriver("#hello"),
     COUNTER: CycleDOM.makeDOMDriver("#counter"),
     HTTP: CycleHTTPDriver.makeHTTPDriver(),
-    HTTP_DOM: CycleDOM.makeDOMDriver("#http-dom")
+    HTTP_DOM: CycleDOM.makeDOMDriver("#http-dom"),
+    BMI_DOM: CycleDOM.makeDOMDriver("#bmi")
 };
 
 //Run app
